@@ -1,0 +1,157 @@
+#include <TimerOne.h>  //Uključivanje biblioteke za korišćenje Timer1
+#include <LiquidCrystal.h> //Uključivanje biblioteke za rad sa LCD
+
+
+const int rs=12, en=11, d4=7, d5=6, d6=5, d7=4; //deklaracija pinova na koje je povezan LCD
+LiquidCrystal mojLCD(rs,en,d4,d5,d6,d7); //Kreira promenljivu tipa LiquidCrystal, mojLCD rs: broj Arduino pina koji je povezan na RS pin LCD-a en: broj Arduino pina koji je povezan na Enable pin LCD-a d4, d5, d6, d7: brojevi Arduino pinova koji su povezani na odgovarajuće pinove LCD-a za prenos podataka
+
+byte stepen[8]={ //simbol stepena
+B11100,
+B10100,
+B11100,
+B00000,
+B00000,
+B00000,
+B00000,
+};
+  //deklaracija pinova
+const int senzorPin=A0;
+const int relej1=9;
+const int relej2=8;
+
+const int tasterPin0=10; //T1
+const int tasterPin1=13; //T1
+const int tasterPin2=2; //T2
+const int tasterPin3=3; //T2
+
+int taster1;
+int taster2;
+int taster3;
+int taster4;
+
+
+const unsigned long vremeOcitavanja=1000000;  //Vreme ulaska u void tajmerISR
+volatile int temperatura;
+int senzor;
+float napon;
+int fleg1, fleg2, fleg3, fleg4, flegStampa;
+
+
+int roundtemp;
+float TG=15.0, TK=25.0;  //TG-temperatura fiktivnog grejača, TK-temperatura fiktivne klime
+
+void setup() {
+  // put your setup code here, to run once:
+//Konfiguracija specificiranih pinova kao ulazne/izlazne
+  pinMode(relej1,OUTPUT);
+  pinMode(relej2,OUTPUT);
+  pinMode(tasterPin0,INPUT);
+  pinMode(tasterPin1,INPUT);
+  pinMode(tasterPin2,INPUT);
+  pinMode(tasterPin3,INPUT);
+
+
+mojLCD.begin(16,2); //Inicijalizuje interfejs LCD-a i specificira dimenzije LCD-a; ova funkcija mora biti pozvana pre bilo koje druge LCD funkcije
+mojLCD.createChar(0,stepen); //Kreira karakter za LCD.
+mojLCD.setCursor(0,0);
+mojLCD.print("Pametna pecka");
+delay(2000);
+ 
+Timer1.initialize(vremeOcitavanja); //Ovde je inicijalizovan tajmer korišćenjem funkcije Timer1.initialize(vrednost). Argument funkcije je vrednost do koje će brojati tajmer pre nego što izazove prekid
+Timer1.attachInterrupt(tajmerISR); //Na svaku 1 s, izvršavaće se prekidna rutina tajmerISR().
+}
+
+void loop() {
+
+  taster1=digitalRead(tasterPin0); //T1
+  if (taster1 == HIGH) {
+    fleg1 = 1;
+    delay(300);
+  }
+  taster2=digitalRead(tasterPin1); //T1
+  if (taster2 == HIGH) {
+    fleg2 = 1;
+    delay(300);
+  }
+  taster3=digitalRead(tasterPin2); //T2
+  if (taster3 == HIGH) {
+    fleg3 = 1;
+    delay(300);
+  }
+  taster4=digitalRead(tasterPin3); //T2
+  if (taster4 == HIGH) {
+    fleg4 = 1;
+    delay(300);
+  }  
+ 
+  if(fleg1==1){
+    TG--;
+ 
+    fleg1=0;
+  }
+  if(fleg2==1){
+    TG++;
+ 
+    fleg2=0;
+  }
+  if(fleg3==1){
+    TK++;
+ 
+    fleg3=0;
+  }
+  if(fleg4==1){
+    TK--;
+    fleg4=0;
+  }
+
+
+
+////////
+ if(temperatura<TG){
+    digitalWrite(relej1, HIGH);
+  }
+  else {
+     digitalWrite(relej1, LOW);
+  }
+////////
+  if(temperatura>TK){
+    digitalWrite(relej2,HIGH);
+  }
+  else {
+     digitalWrite(relej2, LOW);
+  } 
+
+  if (flegStampa) {
+    mojLCD.clear();
+    mojLCD.print("T=");
+    mojLCD.setCursor(3,0);
+    mojLCD.print(roundtemp);
+    mojLCD.setCursor(5,0);
+    mojLCD.write(byte(0));
+    
+    mojLCD.setCursor(0,1);
+    mojLCD.print("TK="); //temperatura kojom se kontroliše klima
+    mojLCD.setCursor(3,1);
+    mojLCD.print(TK);
+    mojLCD.setCursor(5,1);
+    mojLCD.write(byte(0)); 
+
+    mojLCD.setCursor(9,1);
+    mojLCD.print("TG="); //temperatura kojom se kontroliše grejač
+    mojLCD.setCursor(12,1);
+    mojLCD.print(TG);
+    mojLCD.setCursor(14,1);
+    mojLCD.write(byte(0));
+    flegStampa = 0;
+  }
+
+  
+}
+
+void tajmerISR(){
+senzor=analogRead(senzorPin);
+napon=senzor*5.0/1024.0;
+temperatura=(napon-0.5)*100.0;
+roundtemp=round(temperatura);
+flegStampa = 1;
+}
